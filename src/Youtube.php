@@ -1,6 +1,6 @@
 <?php
 
-namespace Dawson\Youtube;
+namespace Schoooch\Youtube;
 
 use Exception;
 use Carbon\Carbon;
@@ -144,6 +144,8 @@ class Youtube
 
             // Set the Snippet from Uploaded Video
             $this->snippet = $status['snippet'];
+
+            // Need to claim the video if youtube partner
 
         }  catch (\Google_Service_Exception $e) {
             throw new Exception($e->getMessage());

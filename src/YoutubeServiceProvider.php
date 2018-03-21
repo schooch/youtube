@@ -1,6 +1,6 @@
 <?php
 
-namespace Dawson\Youtube;
+namespace Schoooch\Youtube;
 
 use Illuminate\Support\ServiceProvider;
 
