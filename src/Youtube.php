@@ -32,6 +32,13 @@ class Youtube
     protected $youtube;
 
     /**
+     * Google YouTube Service
+     *
+     * @var \Google_Service_YouTubePartner
+     */
+    protected $youtubePartner;
+
+    /**
      * Video ID
      *
      * @var string
@@ -63,7 +70,11 @@ class Youtube
 
         $this->client = $this->setup($client);
 
+        // Define an object that will be used to make all API requests.
         $this->youtube = new \Google_Service_YouTube($this->client);
+
+        // YouTube Partner object used to make Content ID API requests.
+        $this->youtubePartner = new \Google_Service_YouTubePartner($this->client);
 
         if ($accessToken = $this->getLatestAccessTokenFromDB()) {
             $this->client->setAccessToken($accessToken);
@@ -87,6 +98,13 @@ class Youtube
         $this->handleAccessToken();
 
         try {
+            $contentOwnersListResponse = $this->youtubePartner->contentOwners->listContentOwners(
+                array('fetchMine' => true));
+            $contentOwnerId = $contentOwnersListResponse['items'][0]['id'];
+
+            // SniffrMedia Channel ID
+            $channelId = "UCCfC7qhih8R5gwYkIHcVEpQ";
+
             // Setup the Snippet
             $snippet = new \Google_Service_YouTube_VideoSnippet();
 
@@ -111,7 +129,7 @@ class Youtube
             $this->client->setDefer(true);
 
             // Build the request
-            $insert = $this->youtube->videos->insert('status,snippet', $video);
+            $insert = $this->youtube->videos->insert('status,snippet', $video, array('onBehalfOfContentOwner' => $contentOwnerId, 'onBehalfOfContentOwnerChannel' => $channelId));
 
             // Upload
             $media = new \Google_Http_MediaFileUpload(
@@ -147,6 +165,84 @@ class Youtube
 
             // Need to claim the video if youtube partner
 
+            // Create an asset resource and set its metadata and type. Assets support
+            // many metadata fields, but this sample only sets a title and description.
+            $asset = new \Google_Service_YouTubePartner_Asset();
+            $metadata = new \Google_Service_YouTubePartner_Metadata();
+            $metadata->setTitle("Test asset title");
+            $metadata->setDescription("Test asset description");
+            $asset->setMetadata($metadata);
+            $asset->setType("web");
+
+            // Insert the asset resource. Extract its unique asset ID from the API
+            // response.
+            $assetInsertResponse = $this->youtubePartner->assets->insert($asset,
+                array('onBehalfOfContentOwner' => $contentOwnerId));
+            $assetId = $assetInsertResponse['id'];
+
+            // Create a territory owner with owner, ratio, type and territories
+            // Set the asset's ownership data. This example identifies the content
+            // owner associated with the authenticated user's account as the asset's
+            // owner. It indicates that the content owner owns 100% of the asset
+            // worldwide.
+            $owners = new \Google_Service_YouTubePartner_TerritoryOwners();
+            $owners->setOwner($contentOwnerId);
+            $owners->setRatio(100);
+            $owners->setType("exclude");
+            $owners->setTerritories(array());
+
+            // Create ownership with a territory owner
+            $ownership = new \Google_Service_YouTubePartner_RightsOwnership();
+            $ownership->setGeneral(array($owners));
+
+            // Update the asset's ownership with the rights data defined above.
+            $ownershipUpdateResponse = $this->youtubePartner->ownership->update($assetId, $ownership,
+                array('onBehalfOfContentOwner' => $contentOwnerId));
+
+            // Define a monetization policy for the asset.
+            $policy = new \Google_Service_YouTubePartner_Policy();
+            $policyRule = new \Google_Service_YouTubePartner_PolicyRule();
+            $policyRule->setAction("monetize");
+            $policy->setRules(array($policyRule));
+
+            // Create a claim resource. Identify the video being claimed, the asset
+            // that represents the claimed content, the type of content being claimed,
+            // and the policy that you want to apply to the claimed video.
+            $claim = new \Google_Service_YouTubePartner_Claim();
+            $claim->setAssetId($assetId);
+            $claim->setVideoId($this->videoId);
+            $claim->setPolicy($policy);
+            $claim->setContentType("audiovisual");
+
+            // Insert the created claim.
+            $claimInsertResponse = $this->youtubePartner->claims->insert($claim,
+                array('onBehalfOfContentOwner' => $contentOwnerId));
+
+            # Enable ads for the video. This example enables the TrueView ad format.
+            // $option = new Google_Service_YouTubePartner_VideoAdvertisingOption();
+            // $option->setAdFormats(array("trueview_instream"));
+            // $setAdvertisingResponse = $this->youtubePartner->videoAdvertisingOptions->update(
+            //     $videoId, $option, array('onBehalfOfContentOwner' => $contentOwnerId));
+
+
+            // $htmlBody .= "<h3>Video Uploaded</h3><ul>";
+            // $htmlBody .= sprintf('<li>%s (%s) for content owner %s</li>',
+            //     $status['snippet']['title'],
+            //     $videoId, $contentOwnerId);
+
+            // $htmlBody .= "<h3>Asset created</h3><ul>";
+            // $htmlBody .= sprintf('<li>%s</li>',
+            //     $assetId);
+
+            // $htmlBody .= "<h3>Claim uploaded</h3><ul>";
+            // $htmlBody .= sprintf('<li>%s with policy "%s"</li>',
+            //     $claimInsertResponse['id'], $claimInsertResponse['policy']['rules'][0]['action']);
+
+            // $htmlBody .= "<h3>Advertising Option Added</h3><ul>";
+            // $htmlBody .= sprintf('<li>%s</li>',
+            //     $setAdvertisingResponse['adFormats'][0]);
+
+            // $htmlBody .= '</ul>';
         }  catch (\Google_Service_Exception $e) {
             throw new Exception($e->getMessage());
         } catch (\Google_Exception $e) {
@@ -207,6 +303,70 @@ class Youtube
     }
 
     /**
+     * Set the video status by id
+     *
+     * @param  int  $video_id
+     * @param  string  $status
+     *
+     * @return bool
+     */
+    public function setStatus($video_id, $status = 'unlisted') {
+        $listResponse = $this->youtube->videos->listVideos("status", array('id' => $video_id));
+
+        // If $listResponse is empty, the specified video was not found.
+        if (!isset($listResponse[0])) {
+             return false; // No video exists
+        } else {
+            // Since the request specified a video ID, the response only contains one video resource.
+            $video = $listResponse[0];
+
+            $videoStatus = $video['status'];
+            $videoStatus->privacyStatus = $status;
+
+            // Set the status
+            $video->setStatus($videoStatus);
+
+            // Update the video resource by calling the videos.update() method.
+            $updateResponse = $this->youtube->videos->update("status", $video);
+        }
+
+        return $updateResponse;
+    }
+
+    /**
+     * Set the video snippet by if
+     *
+     * @param  int  $video_id
+     * @param  string  $title
+     * @param  string  $description
+     * @param  array  $tags
+     *
+     * @return 
+     */
+    public function setSnippet($video_id, $title = '', $description = '', $tags = array()) {
+        $listResponse = $this->youtube->videos->listVideos("snippet", array('id' => $video_id));
+
+        // If $listResponse is empty, the specified video was not found.
+        if (!isset($listResponse[0])) {
+             return sprintf('<h3>Can\'t find a video with video id: %s</h3>', $video_id);
+        } else {
+            // Since the request specified a video ID, the response only contains one video resource.
+            $video = $listResponse[0];
+
+            $videoSnippet = $video['snippet'];
+            $videoSnippet->title = $title;
+            $videoSnippet->description = $description;
+            $videoSnippet->tags = $tags;
+
+            // Set the status
+            $video->setSnippet($videoSnippet);
+
+            // Update the video resource by calling the videos.update() method.
+            $updateResponse = $this->youtube->videos->update("snippet", $video);
+        }
+    }
+
+    /**
      * Delete a YouTube video by it's ID.
      *
      * @param  int  $id
@@ -240,6 +400,30 @@ class Youtube
         if (empty($response->items)) return false;
 
         return true;
+    }
+
+    /**
+     * Return the Video duration
+     * @param  int  $video_id
+     * 
+     * @return int
+     */
+    public function getDuration($video_id) {
+        $listResponse = $this->youtube->videos->listVideos("contentDetails", array('id' => $video_id));
+
+        // If $listResponse is empty, the specified video was not found.
+        if (!isset($listResponse[0])) {
+             return sprintf('<h3>Can\'t find a video with video id: %s</h3>', $video_id);
+        } else {
+            $seconds = 0;
+            if(isset($listResponse[0]['contentDetails']) && isset($listResponse[0]['contentDetails']['duration'])){
+                // Since the request specified a video ID, the response only contains one video resource.
+                $duration = $listResponse[0]['contentDetails']['duration'];
+                $seconds = TimeHelper::ISO8601ToSeconds($duration);
+            }
+
+            return $seconds;
+        }
     }
 
     /**
