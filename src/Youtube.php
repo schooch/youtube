@@ -419,11 +419,31 @@ class Youtube
             if(isset($listResponse[0]['contentDetails']) && isset($listResponse[0]['contentDetails']['duration'])){
                 // Since the request specified a video ID, the response only contains one video resource.
                 $duration = $listResponse[0]['contentDetails']['duration'];
-                $seconds = TimeHelper::ISO8601ToSeconds($duration);
+                $seconds = $this->ISO8601ToSeconds($duration);
             }
 
             return $seconds;
         }
+    }
+
+    /**
+     * Converts Time ISO-8601 to secs
+     *
+     * @return int
+     */
+    public static function ISO8601ToSeconds($ISO8601)
+    {
+        preg_match('/(\d{1,2})[H]/', $ISO8601, $hours);
+        preg_match('/(\d{1,2})[M]/', $ISO8601, $minutes);
+        preg_match('/(\d{1,2})[S]/', $ISO8601, $seconds);
+
+        $hours = isset($hours[1]) ? $hours[1] : 0;
+        $minutes = isset($minutes[1]) ? $minutes[1] : 0;
+        $seconds = isset($seconds[1]) ? $seconds[1] : 0;
+
+        $totalSeconds = ($hours * 60 * 60) + ($minutes * 60) + $seconds;
+
+        return $totalSeconds;
     }
 
     /**
