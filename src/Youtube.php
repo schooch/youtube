@@ -202,7 +202,7 @@ class Youtube
             // Define a monetization policy for the asset.
             $policy = new \Google_Service_YouTubePartner_Policy();
             $policyRule = new \Google_Service_YouTubePartner_PolicyRule();
-            $policyRule->setAction("monetize");
+            $policyRule->setAction("track");
             $policy->setRules(array($policyRule));
 
             // Create a claim resource. Identify the video being claimed, the asset
