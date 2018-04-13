@@ -7,7 +7,7 @@
 To install, use the following to pull the package in via Composer.
 
 ```
-composer require schoooch/youtube
+composer require schooch/youtube
 ```
 
 Now register the Service provider in `config/app.php`
@@ -15,7 +15,7 @@ Now register the Service provider in `config/app.php`
 ```php
 'providers' => [
     ...
-    Schoooch\Youtube\YoutubeServiceProvider::class,
+    schooch\Youtube\YoutubeServiceProvider::class,
 ],
 ```
 
@@ -24,7 +24,7 @@ And also add the alias to the same file.
 ```php
 'aliases' => [
     ...
-    'Youtube' => Schoooch\Youtube\Facades\Youtube::class,
+    'Youtube' => schooch\Youtube\Facades\Youtube::class,
 ],
 ```
 
@@ -33,7 +33,7 @@ And also add the alias to the same file.
 You now need to publish the `youtube.php` config and migrations.
 
 ```
-php artisan vendor:publish --provider="Schoooch\Youtube\YoutubeServiceProvider"
+php artisan vendor:publish --provider="schooch\Youtube\YoutubeServiceProvider"
 ```
 
 Now you'll want to run `php artisan migrate` to create the `youtube_access_tokens` table which as you would imagine, will contain your access tokens once you're authenticated correctly.
