@@ -1,6 +1,6 @@
 <?php
 
-namespace Schoooch\Youtube\Facades;
+namespace Schooch\Youtube\Facades;
 
 use Illuminate\Support\Facades\Facade;
 

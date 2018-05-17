@@ -1,6 +1,6 @@
 <?php
 
-namespace Schoooch\Youtube;
+namespace Schooch\Youtube;
 
 use Illuminate\Support\ServiceProvider;
 
