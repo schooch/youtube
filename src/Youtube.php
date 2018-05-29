@@ -98,38 +98,13 @@ class Youtube
         $this->handleAccessToken();
 
         try {
-            $contentOwnersListResponse = $this->youtubePartner->contentOwners->listContentOwners(
-                array('fetchMine' => true));
-            $contentOwnerId = $contentOwnersListResponse['items'][0]['id'];
-
-            // SniffrMedia Channel ID
-            $channelId = "UCCfC7qhih8R5gwYkIHcVEpQ";
-
-            // Setup the Snippet
-            $snippet = new \Google_Service_YouTube_VideoSnippet();
-
-            if (array_key_exists('title', $data))       $snippet->setTitle($data['title']);
-            if (array_key_exists('description', $data)) $snippet->setDescription($data['description']);
-            if (array_key_exists('tags', $data))        $snippet->setTags($data['tags']);
-            if (array_key_exists('category_id', $data)) $snippet->setCategoryId($data['category_id']);
-
-            // Set the Privacy Status
-            $status = new \Google_Service_YouTube_VideoStatus();
-            $status->privacyStatus = $privacyStatus;
-
-            // Set the Snippet & Status
-            $video = new \Google_Service_YouTube_Video();
-            $video->setSnippet($snippet);
-            $video->setStatus($status);
-
-            // Set the Chunk Size
-            $chunkSize = 1 * 1024 * 1024;
-
-            // Set the defer to true
-            $this->client->setDefer(true);
-
-            // Build the request
-            $insert = $this->youtube->videos->insert('status,snippet', $video, array('onBehalfOfContentOwner' => $contentOwnerId, 'onBehalfOfContentOwnerChannel' => $channelId));
+			$video = $this->getVideo($data, $privacyStatus);
+			// Set the Chunk Size
+			$chunkSize = 1 * 1024 * 1024;
+			// Set the defer to true
+			$this->client->setDefer(true);
+			// Build the request
+			$insert = $this->youtube->videos->insert('status,snippet', $video);
 
             // Upload
             $media = new \Google_Http_MediaFileUpload(
@@ -303,7 +278,35 @@ class Youtube
         return $this->youtube->videos->delete($id);
     }
 
-    /**
+	/**
+	 * @param $data
+	 * @param $privacyStatus
+	 * @param null $id
+	 * @return \Google_Service_YouTube_Video
+	 */
+	private function getVideo($data, $privacyStatus, $id = null)
+	{
+		// Setup the Snippet
+		$snippet = new \Google_Service_YouTube_VideoSnippet();
+		if (array_key_exists('title', $data))       $snippet->setTitle($data['title']);
+		if (array_key_exists('description', $data)) $snippet->setDescription($data['description']);
+		if (array_key_exists('tags', $data))        $snippet->setTags($data['tags']);
+		if (array_key_exists('category_id', $data)) $snippet->setCategoryId($data['category_id']);
+		// Set the Privacy Status
+		$status = new \Google_Service_YouTube_VideoStatus();
+		$status->privacyStatus = $privacyStatus;
+		// Set the Snippet & Status
+		$video = new \Google_Service_YouTube_Video();
+		if ($id)
+		{
+			$video->setId($id);
+		}
+		$video->setSnippet($snippet);
+		$video->setStatus($status);
+		return $video;
+	}
+
+	/**
      * Check if a YouTube video exists by it's ID.
      *
      * @param  int  $id
